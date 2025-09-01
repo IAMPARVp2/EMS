@@ -1,110 +1,259 @@
-import React, { useState } from 'react';
-
-// Icon components for better readability
-const MailIcon = () => <svg className="icon-start" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
-const LockIcon = () => <svg className="icon-start" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
-const EyeIcon = ({ onClick }) => <svg className="icon-end" onClick={onClick} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
-const GoogleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M21.35 11.1h-9.2v2.8h5.3c-.2 1.9-1.6 3.7-3.6 3.7-2.2 0-4-1.8-4-4s1.8-4 4-4c1.1 0 2 .5 2.6 1l2.1-2.1C16.2 6.7 14.2 6 12 6c-3.3 0-6 2.7-6 6s2.7 6 6 6c3.1 0 5.6-2.2 5.6-5.6 0-.4 0-.7-.1-1.1z"/></svg>;
-const AppleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 12.2C19.3 11 18.8 10 18.1 9.1c-.7-.9-1.6-1.5-2.9-1.5-1.5 0-2.8 1-3.6 1-.8 0-1.8-1-3.1-1-1.5 0-2.9.9-3.7 2.3-.8 1.4-1 3.3.2 5.4.8 1.9 1.7 3.4 2.9 3.4.4 0 1.2-.5 2.1-.5.9 0 1.5.5 2.1.5.6 0 1.3-.5 2.1-.5.9 0 1.6.5 2.1.5.8 0 1.7-1.3 2.5-3.1.5-1 .7-2 .7-2.9m-3.4-7.4c.5-.6.9-1.4 1.1-2.3-.9.1-1.9.7-2.6 1.5-.6.7-1.1 1.6-1.1 2.5.9 0 1.9-.6 2.6-1.7"/></svg>;
-
+import React, { useState } from "react";
+import { useFormik } from "formik";
+import { MailIcon, LockIcon, EyeIcon, GoogleIcon, AppleIcon } from "./Icons";
 
 function LoginForm() {
-    const [activeTab, setActiveTab] = useState('signIn');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState("signIn"); // choose api routes based on this
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-    const handlePasswordVisibility = () => {
-        setShowPassword(!showPassword);
-    };
+  // const [confirmPassword, setConfirmPassword] = useState('');
+  // const [confirmError, setConfirmError] = useState('');
 
-    const handleSubmit = (event) => {
-        event.preventDefault();
-        // Handle form submission logic here
-        console.log({ email, password });
-        alert('Form submitted! Check the console for data.');
-    };
+  const handlePasswordVisibility = () => setShowPassword((prev) => !prev);
 
-    return (
-        <div className="auth-card">
-            <div className="tab-switcher">
-                <button
-                    className={`tab-btn ${activeTab === 'signIn' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('signIn')}
-                >
-                    Sign In
-                </button>
-                <button
-                    className={`tab-btn ${activeTab === 'signUp' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('signUp')}
-                >
-                    Sign Up
-                </button>
+  // Formik handles form state/validation for both sign-in and sign-up
+  const formik = useFormik({
+    initialValues: { name: "", email: "", password: "", confirmPassword: "" },
+    validate: (values) => {
+      const errors = {};
+      if (activeTab === "signUp" && !values.name) {
+        errors.name = "Name required";
+      }
+
+      if (!values.email) errors.email = "Email required";
+      else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(values.email)) {
+        errors.email = "Invalid email";
+      }
+
+      if (!values.password) errors.password = "Password required";
+      else if (values.password.length < 6)
+        errors.password = "Minimum 6 characters";
+
+      if (!values.confirmPassword) {
+        errors.confirmPassword = "Confirm password is required";
+      } else if (values.confirmPassword !== values.password) {
+        errors.confirmPassword = "Passwords must match";
+      }
+      return errors;
+    },
+    onSubmit: async (values, { setErrors, resetForm, setSubmitting }) => {
+      setLoading(true);
+      setSubmitting(true);
+      try {
+        // pick endpoint by tab
+        const endpoint =
+          activeTab === "signIn" ? "/api/auth/login" : "/api/auth/register";
+        const method = "POST";
+
+        const res = await fetch(endpoint, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          // map server validation to formik if supplied
+          if (data.errors) setErrors(data.errors);
+          else if (data.message) setErrors({ password: data.message });
+          else setErrors({ password: "Server error" });
+        } else {
+          // success handling (token storage / redirect as needed)
+          alert(
+            `${
+              activeTab === "signIn" ? "Signed in" : "Registered"
+            } successfully`
+          );
+          resetForm();
+        }
+      } catch (err) {
+        console.error(err);
+        setErrors({ password: "Network error" });
+      } finally {
+        setLoading(false);
+        setSubmitting(false);
+      }
+    },
+  });
+
+  // Example GET for sign out (demo)
+  const handleSignOut = async () => {
+    try {
+      const res = await fetch("/api/auth/logout", { method: "GET" });
+      if (res.ok) alert("Signed out");
+      else alert("Sign out failed");
+    } catch (err) {
+      console.error(err);
+      alert("Network error");
+    }
+  };
+
+  return (
+    <div className="auth-card">
+      <div className="tab-switcher">
+        <button
+          className={`tab-btn ${activeTab === "signIn" ? "active" : ""}`}
+          onClick={() => setActiveTab("signIn")}
+          type="button"
+        >
+          Sign In
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "signUp" ? "active" : ""}`}
+          onClick={() => setActiveTab("signUp")}
+          type="button"
+        >
+          Sign Up
+        </button>
+      </div>
+
+      <div className="form-container">
+        <h3>
+          {activeTab === "signIn"
+            ? "Sign in to your account"
+            : "Create a new account"}
+        </h3>
+        <p className="form-intro">
+          {activeTab === "signIn"
+            ? "Enter your email and password to access your account"
+            : "Get started by creating your account"}
+        </p>
+
+        <form onSubmit={formik.handleSubmit} noValidate>
+          {activeTab === "signUp" && (
+            <div className="form-group">
+              <label htmlFor="name">Name</label>
+              <div className="input-with-icon">
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  required
+                />
+              </div>
+              {formik.touched.name && formik.errors.name && (
+                <div style={{ color: "red" }}>{formik.errors.name}</div>
+              )}
             </div>
+          )}
 
-            <div className="form-container">
-                <h3>{activeTab === 'signIn' ? 'Sign in to your account' : 'Create a new account'}</h3>
-                <p className="form-intro">
-                    {activeTab === 'signIn' ? 'Enter your email and password to access your account' : 'Get started by creating your account'}
-                </p>
-                
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label htmlFor="email">Email</label>
-                        <div className="input-with-icon">
-                            <MailIcon />
-                            <input
-                                type="email"
-                                id="email"
-                                placeholder="john@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="password">Password</label>
-                        <div className="input-with-icon">
-                            <LockIcon />
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                id="password"
-                                placeholder="Enter your password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                            <EyeIcon onClick={handlePasswordVisibility} />
-                        </div>
-                    </div>
-                    {activeTab === 'signIn' && (
-                        <div className="form-options">
-                            <a href="#" className="forgot-password">Forgot password?</a>
-                        </div>
-                    )}
-                    <button type="submit" className="btn btn-primary btn-full">
-                        {activeTab === 'signIn' ? 'Sign In' : 'Sign Up'}
-                    </button>
-                </form>
-
-                <div className="separator">
-                    <span>OR CONTINUE WITH</span>
-                </div>
-
-                <div className="social-logins">
-                    <button className="btn-social">
-                        <GoogleIcon />
-                        <span>Google</span>
-                    </button>
-                    <button className="btn-social">
-                        <AppleIcon />
-                        <span>Apple</span>
-                    </button>
-                </div>
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <div className="input-with-icon">
+              <MailIcon />
+              <input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="john@example.com"
+                value={formik.values.email}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                required
+              />
             </div>
+            {formik.touched.email && formik.errors.email && (
+              <div style={{ color: "red" }}>{formik.errors.email}</div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <div className="input-with-icon">
+              <LockIcon />
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={formik.values.password}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                required
+              />
+              <EyeIcon onClick={handlePasswordVisibility} />
+            </div>
+            {formik.touched.password && formik.errors.password && (
+              <div style={{ color: "red" }}>{formik.errors.password}</div>
+            )}
+          </div>
+
+          {activeTab === "signUp" && (
+            <div className="form-group">
+              <label htmlFor="confirmpassword">Confirm Password</label>
+              <div className="input-with-icon">
+                <LockIcon />
+                <input
+                  id="password"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={formik.values.confirmPassword}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  required
+                />
+              </div>
+              {formik.touched.confirmPassword && formik.errors.confirmPassword && (
+                <div style={{ color: "red" }}>{formik.errors.confirmPassword}</div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "signIn" && (
+            <div className="form-options">
+              <a href="#" className="forgot-password">
+                Forgot password?
+              </a>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn btn-primary btn-full"
+            disabled={formik.isSubmitting || loading}
+          >
+            {loading
+              ? "Please wait..."
+              : activeTab === "signIn"
+              ? "Sign In"
+              : "Sign Up"}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 10 }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={handleSignOut}
+          >
+            Sign Out (demo GET)
+          </button>
         </div>
-    );
+
+        <div className="separator">
+          <span>OR CONTINUE WITH</span>
+        </div>
+
+        <div className="social-logins">
+          <button className="btn-social" type="button">
+            <GoogleIcon />
+            <span>Google</span>
+          </button>
+          <button className="btn-social" type="button">
+            <AppleIcon />
+            <span>Apple</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default LoginForm;
